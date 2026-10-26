@@ -29,12 +29,12 @@ def build_features(starttime, core, memory, ssd, nic, priority):
         hour_sin, hour_cos, day_sin, day_cos,
         is_business, is_weekend,
         core, memory, ssd, nic,
-        resource_load, priority
+        resource_load
     ]])
 
 def train_model():
     print("Loading real Azure data...")
-    df = pd.read_csv("/Users/m_masoor/Desktop/Data/Azure_Data0.csv")
+    df = pd.read_csv("data/Azure_Data0.csv")
 
     # Calculate duration in minutes
     df['duration'] = (df['endtime'] - df['starttime']) * 24 * 60
