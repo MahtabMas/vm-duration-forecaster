@@ -19,3 +19,29 @@ def score_minutes(true_target, predicted_target):
         "mae_minutes": errors.mean(),
         "median_abs_error_minutes": np.median(errors),
     }
+
+def score_by_bucket(true_target, predicted_target):
+    # Scores for short, medium and long jobs (grouped by true duration).
+    true_target = np.asarray(true_target)
+    predicted_target = np.asarray(predicted_target)
+    true_minutes = np.expm1(true_target)
+    predicted_minutes = np.expm1(predicted_target)
+    log_error = predicted_target - true_target
+
+    buckets = {
+        "short (under 30 min)": true_minutes < 30,
+        "medium (30 min to 12 h)": (true_minutes >= 30) & (true_minutes < 720),
+        "long (12 h or more)": true_minutes >= 720,
+    }
+
+    rows = {}
+    for name, mask in buckets.items():
+        rows[name] = {
+            "jobs": int(mask.sum()),
+            "log_mae": np.abs(log_error[mask]).mean(),
+            "bias": log_error[mask].mean(),
+            "median_abs_error_minutes": np.median(
+                np.abs(true_minutes[mask] - predicted_minutes[mask])
+            ),
+        }
+    return rows

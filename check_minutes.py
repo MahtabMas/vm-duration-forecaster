@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
 from data import get_model_data
-from metrics import score_minutes
+from metrics import score_minutes, score_by_bucket
 
 (train_features, train_target,
  validation_features, validation_target,
@@ -27,3 +27,10 @@ for name, predicted in predictions.items():
     print(f"{name}:")
     print("  mae (minutes):", round(scores["mae_minutes"], 1))
     print("  median absolute error (minutes):", round(scores["median_abs_error_minutes"], 1))
+
+for name, predicted in predictions.items():
+    print(f"{name} by duration bucket:")
+    for bucket_name, row in score_by_bucket(validation_target, predicted).items():
+        print(f"  {bucket_name}: jobs {row['jobs']}, log mae {row['log_mae']:.3f}, "
+              f"bias {row['bias']:+.3f}, "
+              f"median abs error {row['median_abs_error_minutes']:.1f} min")
