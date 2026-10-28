@@ -1,3 +1,4 @@
+import copy
 import time
 import torch
 from torch import nn
@@ -6,7 +7,8 @@ from mlp import VMDurationNet
 from metrics import score_log_scale
 
 BATCH_SIZE = 256
-NUMBER_OF_EPOCHS = 15
+MAX_EPOCHS = 100
+PATIENCE = 10
 
 (train_features, train_target,
  validation_features, validation_target,
@@ -19,15 +21,21 @@ train_scaled, validation_scaled, test_scaled = standardize(
 train_inputs = torch.tensor(train_scaled.values, dtype=torch.float32)
 train_targets = torch.tensor(train_target.values, dtype=torch.float32)
 validation_inputs = torch.tensor(validation_scaled.values, dtype=torch.float32)
+validation_targets = torch.tensor(validation_target.values, dtype=torch.float32)
 
 torch.manual_seed(42)
 model = VMDurationNet()
 loss_function = nn.MSELoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 
+best_validation_loss = float("inf")
+best_epoch = 0
+best_weights = None
+epochs_without_improvement = 0
+
 start_time = time.time()
 
-for epoch in range(1, NUMBER_OF_EPOCHS + 1):
+for epoch in range(1, MAX_EPOCHS + 1):
     model.train()
     shuffled_order = torch.randperm(len(train_inputs))
     total_loss = 0.0
@@ -50,10 +58,36 @@ for epoch in range(1, NUMBER_OF_EPOCHS + 1):
 
     model.eval()
     with torch.no_grad():
-        validation_predictions = model(validation_inputs).numpy()
-    scores = score_log_scale(validation_target, validation_predictions)
+        validation_predictions = model(validation_inputs)
+        validation_loss = loss_function(validation_predictions, validation_targets).item()
+    scores = score_log_scale(validation_target, validation_predictions.numpy())
 
-    print(f"epoch {epoch:2d}  train loss {train_loss:.4f}  "
-          f"validation mae {scores['mae']:.4f}  rmse {scores['rmse']:.4f}  r2 {scores['r2']:.4f}")
+    print(f"epoch {epoch:3d}  train loss {train_loss:.4f}  "
+          f"validation loss {validation_loss:.4f}  mae {scores['mae']:.4f}")
 
-print("training time (seconds):", round(time.time() - start_time, 1))
+    if validation_loss < best_validation_loss:
+        best_validation_loss = validation_loss
+        best_epoch = epoch
+        best_weights = copy.deepcopy(model.state_dict())
+        epochs_without_improvement = 0
+    else:
+        epochs_without_improvement += 1
+        if epochs_without_improvement >= PATIENCE:
+            print(f"no improvement for {PATIENCE} epochs, stopping")
+            break
+
+training_seconds = time.time() - start_time
+
+# Go back to the best weights, not the last ones
+model.load_state_dict(best_weights)
+model.eval()
+with torch.no_grad():
+    validation_predictions = model(validation_inputs).numpy()
+final_scores = score_log_scale(validation_target, validation_predictions)
+
+print()
+print("best epoch:", best_epoch)
+print("mlp with early stopping on validation:")
+for name, value in final_scores.items():
+    print(" ", name, round(value, 4))
+print("training time (seconds):", round(training_seconds, 1))
