@@ -17,4 +17,4 @@ __pycache__/
 data/
 
 # macOS
-.DS_Store
+.DS_Storeresults/*.npz
