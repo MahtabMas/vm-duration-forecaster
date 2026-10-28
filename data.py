@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from features import make_features
+from features import make_features, MODEL_FEATURES
 
 DATA_PATH = "data/Azure_Data0.csv"
 
@@ -30,9 +30,9 @@ def get_model_data():
     # Return features and target for train, validation and test.
     train_data, validation_data, test_data = load_and_split()
 
-    train_features = make_features(train_data)
-    validation_features = make_features(validation_data)
-    test_features = make_features(test_data)
+    train_features = make_features(train_data)[MODEL_FEATURES]
+    validation_features = make_features(validation_data)[MODEL_FEATURES]
+    test_features = make_features(test_data)[MODEL_FEATURES]
 
     train_target = make_target(train_data)
     validation_target = make_target(validation_data)

@@ -4,7 +4,7 @@ from torch import nn
 
 
 class VMDurationNet(nn.Module):
-    def __init__(self, number_of_features=11, dropout_rate=0.1):
+    def __init__(self, number_of_features=8, dropout_rate=0.1):
         super().__init__()
         self.layers = nn.Sequential(
             nn.Linear(number_of_features, 64),
@@ -23,8 +23,8 @@ class VMDurationNet(nn.Module):
 def train_mlp(train_inputs, train_targets, validation_inputs, validation_targets,
               seed=42, learning_rate=0.001, weight_decay=0.01, batch_size=256,
               dropout_rate=0.1, max_epochs=100, patience=10):
-    """Train one network with early stopping.
-    Returns the network with its best weights loaded, and the best epoch."""
+    # Train one network with early stopping.
+    # Returns the network with its best weights loaded, and the best epoch.
     torch.manual_seed(seed)
     model = VMDurationNet(dropout_rate=dropout_rate)
     loss_function = nn.MSELoss()

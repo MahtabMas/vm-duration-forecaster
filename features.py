@@ -8,6 +8,11 @@ FEATURE_NAMES = [
     "resource_load",
 ]
 
+MODEL_FEATURES = [
+    "hour_sin", "hour_cos", "is_business",
+    "core", "memory", "ssd", "nic", "resource_load",
+]
+
 
 def make_features(jobs):
     # Turn a table of jobs into the 11 model inputs, all rows at once.
