@@ -28,7 +28,7 @@
       color: #666;
       font-size: 0.9rem;
     }
-    select, input {
+    input {
       width: 100%;
       padding: 8px;
       border: 1px solid #ddd;
@@ -66,13 +66,14 @@
       color: #666;
       margin-bottom: 16px;
     }
-    .savings {
-      background: #e8f5e9;
+    .range-box {
+      background: #eef4fc;
       border-radius: 6px;
       padding: 12px;
       margin: 16px 0;
-      color: #2e7d32;
+      color: #1f3b63;
       text-align: center;
+      line-height: 1.5;
     }
     .explanation {
       background: #f9f9f9;
@@ -94,8 +95,7 @@
 
 <body>
   <h1>⚡ VM Duration Forecaster</h1>
-  <p>Predict VM job duration using 112,552 real Microsoft Azure jobs.</p>
-
+  <p>A model trained on 80,729 Azure VM jobs predicts how long a job will run and gives a 90% range. Set the resource request with the sliders. Predictions are rough: often off by a factor of three or more, and unreliable for jobs that run for days.</p>
   <!-- Form -->
   <div class="form-group">
     <label>Submission Time (hour of day): 
@@ -106,56 +106,20 @@
   </div>
 
   <div class="form-group">
-    <label>Day of Week</label>
-    <select id="day">
-      <option value="0">Monday</option>
-      <option value="1">Tuesday</option>
-      <option value="2">Wednesday</option>
-      <option value="3">Thursday</option>
-      <option value="4">Friday</option>
-      <option value="5">Saturday</option>
-      <option value="6">Sunday</option>
-    </select>
+    <label>CPU Cores (fraction of a server): <span class="value-display" id="core_val">0.021</span></label>
+    <input type="range" id="core" min="0" max="1000" value="21" oninput="refresh()">
   </div>
-
   <div class="form-group">
-    <label>CPU Cores (normalized): 
-      <span class="value-display" id="core_val">0.08</span>
-    </label>
-    <input type="range" id="core" min="0" max="100" value="8"
-           oninput="document.getElementById('core_val').textContent=(this.value/100).toFixed(2)">
+    <label>Memory (fraction of a server): <span class="value-display" id="memory_val">0.021</span></label>
+    <input type="range" id="memory" min="0" max="1000" value="21" oninput="refresh()">
   </div>
-
   <div class="form-group">
-    <label>Memory (normalized): 
-      <span class="value-display" id="memory_val">0.08</span>
-    </label>
-    <input type="range" id="memory" min="0" max="100" value="8"
-           oninput="document.getElementById('memory_val').textContent=(this.value/100).toFixed(2)">
+    <label>SSD (fraction of a server): <span class="value-display" id="ssd_val">0.016</span></label>
+    <input type="range" id="ssd" min="0" max="1000" value="16" oninput="refresh()">
   </div>
-
   <div class="form-group">
-    <label>SSD (normalized): 
-      <span class="value-display" id="ssd_val">0.06</span>
-    </label>
-    <input type="range" id="ssd" min="0" max="100" value="6"
-           oninput="document.getElementById('ssd_val').textContent=(this.value/100).toFixed(2)">
-  </div>
-
-  <div class="form-group">
-    <label>NIC (normalized): 
-      <span class="value-display" id="nic_val">0.10</span>
-    </label>
-    <input type="range" id="nic" min="0" max="100" value="10"
-           oninput="document.getElementById('nic_val').textContent=(this.value/100).toFixed(2)">
-  </div>
-
-  <div class="form-group">
-    <label>Priority</label>
-    <select id="priority">
-      <option value="0">Low (0)</option>
-      <option value="1">High (1)</option>
-    </select>
+    <label>NIC (fraction of a server): <span class="value-display" id="nic_val">0.025</span></label>
+    <input type="range" id="nic" min="0" max="1000" value="25" oninput="refresh()">
   </div>
 
   <button onclick="predict()" id="predictBtn">Predict Duration</button>
@@ -168,26 +132,85 @@
   <div class="result-card" id="resultCard">
     <div class="duration" id="durationNum">--</div>
     <div class="duration-label">minutes predicted</div>
-    <div class="savings" id="savingsDiv"></div>
+    <div class="range-box" id="rangeDiv"></div>
     <div class="explanation" id="explanationDiv"></div>
   </div>
 
   <script>
-  async function predict() {
-    // Convert slider values to normalized (0-1)
-    const hour = parseInt(document.getElementById('hour').value);
-    const day  = parseInt(document.getElementById('day').value);
+  // The 12 VM sizes (resource combinations) that appear in the training days.
+  // Values are fractions of a server (core, memory, ssd, nic).
+  // They are not shown to the user. They only tell the server whether a job is far from
+  // everything the model was trained on, so the explanation can say it is a guess.
+  const VM_TYPES = [
+    { core: 0.020833, memory: 0.020833, ssd: 0.015656, nic: 0.025 },
+    { core: 0.020833, memory: 0.003906, ssd: 0.010064, nic: 0.000125 },
+    { core: 0.041667, memory: 0.041667, ssd: 0.029075, nic: 0.05 },
+    { core: 0.166667, memory: 0.166667, ssd: 0.109589, nic: 0.2 },
+    { core: 0.083333, memory: 0.083333, ssd: 0.055913, nic: 0.1 },
+    { core: 0.333333, memory: 0.333333, ssd: 0.216942, nic: 0.4 },
+    { core: 0.75,     memory: 0.75,     ssd: 0.588202, nic: 0.6 },
+    { core: 0.5,      memory: 0.5,      ssd: 0.324294, nic: 0.525 },
+    { core: 0.666667, memory: 0.666667, ssd: 0.431647, nic: 0.5 },
+    { core: 0.041667, memory: 0.018229, ssd: 0.026838, nic: 0.005 },
+    { core: 0.083333, memory: 0.036458, ssd: 0.053676, nic: 0.01 },
+    { core: 1.0,      memory: 1.0,      ssd: 1.0,      nic: 1.0 }
+  ];
+  // Judgment call, not validated: farther than this from every known size counts as "far".
+  // The two closest known sizes are about 0.03 apart.
+  const CLOSE_ENOUGH = 0.02;
+  const FIELDS = ['core', 'memory', 'ssd', 'nic'];
 
-    // starttime: combine day and hour into days unit
-    const starttime = day + (hour / 24);
+  // Minutes, with a rough hours or days figure for long durations
+  function formatMinutes(minutes) {
+    const text = Math.round(minutes).toLocaleString();
+    if (minutes >= 2880) return `${text} min (about ${(minutes / 1440).toFixed(1)} days)`;
+    if (minutes >= 120) return `${text} min (about ${(minutes / 60).toFixed(1)} hours)`;
+    return `${text} min`;
+  }
+
+  function readSliders() {
+    const values = {};
+    FIELDS.forEach((name) => {
+      values[name] = parseInt(document.getElementById(name).value) / 1000;
+    });
+    return values;
+  }
+
+  function distanceToNearestKnown(values) {
+    let best = Infinity;
+    VM_TYPES.forEach((type) => {
+      const distance = Math.sqrt(
+        (type.core - values.core) ** 2 + (type.memory - values.memory) ** 2 +
+        (type.ssd - values.ssd) ** 2 + (type.nic - values.nic) ** 2
+      );
+      if (distance < best) best = distance;
+    });
+    return best;
+  }
+
+  function refresh() {
+    const values = readSliders();
+    FIELDS.forEach((name) => {
+      document.getElementById(name + '_val').textContent = values[name].toFixed(3);
+    });
+  }
+
+  async function predict() {
+    const hour = parseInt(document.getElementById('hour').value);
+    const values = readSliders();
+    const far = distanceToNearestKnown(values) > CLOSE_ENOUGH;
+
+    // starttime is in days; the model only uses the hour of day
+    const starttime = hour / 24;
 
     const payload = {
       starttime: starttime,
-      core:     parseInt(document.getElementById('core').value) / 100,
-      memory:   parseInt(document.getElementById('memory').value) / 100,
-      ssd:      parseInt(document.getElementById('ssd').value) / 100,
-      nic:      parseInt(document.getElementById('nic').value) / 100,
-      priority: parseInt(document.getElementById('priority').value)
+      core:     values.core,
+      memory:   values.memory,
+      ssd:      values.ssd,
+      nic:      values.nic,
+      priority: 0,    // the training data contains priority 0 jobs only
+      custom:   far   // lets the server tell the explanation that this is a guess
     };
 
     // Show loading, hide results
@@ -206,31 +229,17 @@
 
       const data = await response.json();
 
-      // Display duration
-      document.getElementById('durationNum').textContent =
-        data.predicted_duration;
+      document.getElementById('durationNum').textContent = data.predicted_duration;
 
-      // Display savings
-      const savings = data.savings;
-      const savingsDiv = document.getElementById('savingsDiv');
-      if (savings > 2) {
-        savingsDiv.textContent =
-          `💡 Submit at 3am to save ~${savings} minutes`;
-        savingsDiv.style.background = '#e8f5e9';
-        savingsDiv.style.color = '#2e7d32';
-      } else {
-        savingsDiv.textContent =
-          '✅ Off-peak hours offer no significant savings for this job';
-        savingsDiv.style.background = '#e8f5e9';
-        savingsDiv.style.color = '#2e7d32';
-      }
-      savingsDiv.style.display = 'block';
+      const rangeDiv = document.getElementById('rangeDiv');
+      rangeDiv.textContent =
+        `90% range: ${formatMinutes(data.range_low)} to ${formatMinutes(data.range_high)}. ` +
+        `This range is meant to contain about 9 in 10 similar jobs. On held-out days it ` +
+        `contained about 88%. It is wide because the inputs say little about how long an ` +
+        `individual job runs.`;
+      rangeDiv.style.display = 'block';
 
-      // Display explanation
-      document.getElementById('explanationDiv').textContent =
-        data.explanation;
-
-      // Show result card
+      document.getElementById('explanationDiv').textContent = data.explanation;
       document.getElementById('resultCard').style.display = 'block';
 
     } catch (error) {
@@ -241,7 +250,9 @@
       document.getElementById('loading').style.display = 'none';
     }
   }
+
+  refresh();
 </script>
 
 </body>
-
+</html>

@@ -1,5 +1,23 @@
-model.joblib
+# Model artifacts
+*.joblib
+*.pt
+*.pth
+
+# Python
 __pycache__/
 *.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Secrets
 .env
-chroma_store/
+
+# Data (never commit the Azure CSV)
+*.csv
+data/
+
+# macOS
+.DS_Store
+
+# Saved predictions (regenerate with the experiments)
+results/*.npz
