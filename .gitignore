@@ -16,7 +16,8 @@ __pycache__/
 *.csv
 data/
 
-# macOS
+# Editor and macOS
+.vscode/
 .DS_Store
 
 # Saved predictions (regenerate with the experiments)
