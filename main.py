@@ -1,9 +1,13 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import anthropic
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from model import load_or_train, predict, build_features
+
 
 
 app = FastAPI(title="VM Duration Forecaster")

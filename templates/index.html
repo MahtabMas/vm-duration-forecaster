@@ -94,7 +94,7 @@
 
 <body>
   <h1>⚡ VM Duration Forecaster</h1>
-  <p>Predict VM job duration using 112,552 real Microsoft Azure jobs.</p>
+  <p>A model trained on 80,729 Azure VM jobs predicts how long a job will run. Predictions are rough: often off by a factor of three or more, and unreliable for jobs that run for days.</p>
 
   <!-- Form -->
   <div class="form-group">
@@ -210,20 +210,16 @@
       document.getElementById('durationNum').textContent =
         data.predicted_duration;
 
-      // Display savings
+      // Display the 3am comparison as a rough model estimate, not as advice
       const savings = data.savings;
       const savingsDiv = document.getElementById('savingsDiv');
-      if (savings > 2) {
-        savingsDiv.textContent =
-          `💡 Submit at 3am to save ~${savings} minutes`;
-        savingsDiv.style.background = '#e8f5e9';
-        savingsDiv.style.color = '#2e7d32';
-      } else {
-        savingsDiv.textContent =
-          '✅ Off-peak hours offer no significant savings for this job';
-        savingsDiv.style.background = '#e8f5e9';
-        savingsDiv.style.color = '#2e7d32';
-      }
+      const direction = savings > 0 ? 'fewer' : 'more';
+      savingsDiv.textContent =
+        `Model estimate for the same job at 3am: about ${data.off_peak_duration} minutes ` +
+        `(${Math.abs(savings)} ${direction}). Time of day has only a small effect in this ` +
+        `model, so treat this as a rough estimate, not a recommendation.`;
+      savingsDiv.style.background = '#fff8e1';
+      savingsDiv.style.color = '#6d4c00';
       savingsDiv.style.display = 'block';
 
       // Display explanation
@@ -244,4 +240,4 @@
 </script>
 
 </body>
-
+</html>
