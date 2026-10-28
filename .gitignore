@@ -17,4 +17,7 @@ __pycache__/
 data/
 
 # macOS
-.DS_Storeresults/*.npz
+.DS_Store
+
+# Saved predictions (regenerate with the experiments)
+results/*.npz
