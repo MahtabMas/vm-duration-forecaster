@@ -1,7 +1,10 @@
-from data import load_and_split
+from data import get_model_data
 
-train_data, validation_data, test_data = load_and_split()
+(train_features, train_target,
+ validation_features, validation_target,
+ test_features, test_target) = get_model_data()
 
-print("train:", len(train_data))
-print("validation:", len(validation_data))
-print("test:", len(test_data))
+print("train:", train_features.shape, train_target.shape)
+print("validation:", validation_features.shape, validation_target.shape)
+print("test:", test_features.shape, test_target.shape)
+print("any missing values:", train_features.isna().any().any(), train_target.isna().any())
