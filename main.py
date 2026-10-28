@@ -100,7 +100,4 @@ async def predict_duration(request: Request):
         "range_low":          result["range_low"],
         "range_high":         result["range_high"],
         "explanation":        explanation,
-        # Kept only so the current page keeps working until it is updated in the next step
-        "off_peak_duration":  result["off_peak_duration"],
-        "savings":            result["savings"],
     }
