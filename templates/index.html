@@ -28,37 +28,7 @@
       color: #666;
       font-size: 0.9rem;
     }
-    .hint {
-      color: #666;
-      font-size: 0.85rem;
-      margin-top: 6px;
-    }
-    .warning {
-      color: #8a4b00;
-      font-size: 0.85rem;
-      margin-top: 6px;
-      display: none;
-    }
-    .custom-panel {
-      background: #fff8e1;
-      border: 1px solid #f0d98c;
-      border-radius: 6px;
-      padding: 12px;
-      margin-top: 12px;
-      display: none;
-    }
-    .custom-panel .form-group {
-      margin-bottom: 10px;
-    }
-    .result-warning {
-      background: #fdecea;
-      color: #8a1c10;
-      border-radius: 6px;
-      padding: 12px;
-      margin-bottom: 16px;
-      display: none;
-    }
-    select, input {
+    input {
       width: 100%;
       padding: 8px;
       border: 1px solid #ddd;
@@ -96,13 +66,14 @@
       color: #666;
       margin-bottom: 16px;
     }
-    .savings {
-      background: #e8f5e9;
+    .range-box {
+      background: #eef4fc;
       border-radius: 6px;
       padding: 12px;
       margin: 16px 0;
-      color: #2e7d32;
+      color: #1f3b63;
       text-align: center;
+      line-height: 1.5;
     }
     .explanation {
       background: #f9f9f9;
@@ -124,7 +95,7 @@
 
 <body>
   <h1>⚡ VM Duration Forecaster</h1>
-  <p>A model trained on 80,729 Azure VM jobs (priority 0, one Azure machine) predicts how long a job will run. Choose one of the 12 VM sizes that appear in the data, or enter a custom size. The model has never seen a custom size, so those predictions are guesses. Predictions are rough in any case: often off by a factor of three or more, and unreliable for jobs that run for days.</p>
+  <p>A model trained on 80,729 Azure VM jobs (priority 0, one Azure machine) predicts how long a job will run and gives a 90% range. Set the resource request with the sliders. Predictions are rough: often off by a factor of three or more, and unreliable for jobs that run for days.</p>
 
   <!-- Form -->
   <div class="form-group">
@@ -136,31 +107,20 @@
   </div>
 
   <div class="form-group">
-    <label>VM size</label>
-    <select id="vmtype" onchange="showType()"></select>
-    <div class="hint" id="typeHint"></div>
-    <div class="warning" id="typeWarning"></div>
-
-    <div class="custom-panel" id="customPanel">
-      <div class="form-group">
-        <label>CPU Cores (fraction of a server): <span class="value-display" id="core_val">0.050</span></label>
-        <input type="range" id="core" min="0" max="1000" value="50" oninput="updateCustom()">
-      </div>
-      <div class="form-group">
-        <label>Memory (fraction of a server): <span class="value-display" id="memory_val">0.050</span></label>
-        <input type="range" id="memory" min="0" max="1000" value="50" oninput="updateCustom()">
-      </div>
-      <div class="form-group">
-        <label>SSD (fraction of a server): <span class="value-display" id="ssd_val">0.030</span></label>
-        <input type="range" id="ssd" min="0" max="1000" value="30" oninput="updateCustom()">
-      </div>
-      <div class="form-group">
-        <label>NIC (fraction of a server): <span class="value-display" id="nic_val">0.060</span></label>
-        <input type="range" id="nic" min="0" max="1000" value="60" oninput="updateCustom()">
-      </div>
-      <div class="hint" id="nearestHint"></div>
-      <div class="warning" style="display:block;">This combination is not one of the 12 sizes in the training data. The prediction is an extrapolation that was never validated. Treat it as a guess.</div>
-    </div>
+    <label>CPU Cores (fraction of a server): <span class="value-display" id="core_val">0.021</span></label>
+    <input type="range" id="core" min="0" max="1000" value="21" oninput="refresh()">
+  </div>
+  <div class="form-group">
+    <label>Memory (fraction of a server): <span class="value-display" id="memory_val">0.021</span></label>
+    <input type="range" id="memory" min="0" max="1000" value="21" oninput="refresh()">
+  </div>
+  <div class="form-group">
+    <label>SSD (fraction of a server): <span class="value-display" id="ssd_val">0.016</span></label>
+    <input type="range" id="ssd" min="0" max="1000" value="16" oninput="refresh()">
+  </div>
+  <div class="form-group">
+    <label>NIC (fraction of a server): <span class="value-display" id="nic_val">0.025</span></label>
+    <input type="range" id="nic" min="0" max="1000" value="25" oninput="refresh()">
   </div>
 
   <button onclick="predict()" id="predictBtn">Predict Duration</button>
@@ -171,124 +131,87 @@
 
   <!-- Results -->
   <div class="result-card" id="resultCard">
-    <div class="result-warning" id="resultWarning"></div>
     <div class="duration" id="durationNum">--</div>
     <div class="duration-label">minutes predicted</div>
-    <div class="savings" id="savingsDiv"></div>
+    <div class="range-box" id="rangeDiv"></div>
     <div class="explanation" id="explanationDiv"></div>
   </div>
 
   <script>
-  // The 12 VM sizes (resource combinations) in the training days, most common first.
-  // Values are fractions of a server (core, memory, ssd, nic); jobs = training jobs of this size.
+  // The 12 VM sizes (resource combinations) that appear in the training days.
+  // Values are fractions of a server (core, memory, ssd, nic).
+  // They are not shown to the user. They only tell the server whether a job is far from
+  // everything the model was trained on, so the explanation can say it is a guess.
   const VM_TYPES = [
-    { core: 0.020833, memory: 0.020833, ssd: 0.015656, nic: 0.025,    jobs: 48291 },
-    { core: 0.020833, memory: 0.003906, ssd: 0.010064, nic: 0.000125, jobs: 11783 },
-    { core: 0.041667, memory: 0.041667, ssd: 0.029075, nic: 0.05,     jobs: 7324 },
-    { core: 0.166667, memory: 0.166667, ssd: 0.109589, nic: 0.2,      jobs: 5631 },
-    { core: 0.083333, memory: 0.083333, ssd: 0.055913, nic: 0.1,      jobs: 4970 },
-    { core: 0.333333, memory: 0.333333, ssd: 0.216942, nic: 0.4,      jobs: 2163 },
-    { core: 0.75,     memory: 0.75,     ssd: 0.588202, nic: 0.6,      jobs: 287 },
-    { core: 0.5,      memory: 0.5,      ssd: 0.324294, nic: 0.525,    jobs: 119 },
-    { core: 0.666667, memory: 0.666667, ssd: 0.431647, nic: 0.5,      jobs: 82 },
-    { core: 0.041667, memory: 0.018229, ssd: 0.026838, nic: 0.005,    jobs: 39 },
-    { core: 0.083333, memory: 0.036458, ssd: 0.053676, nic: 0.01,     jobs: 37 },
-    { core: 1.0,      memory: 1.0,      ssd: 1.0,      nic: 1.0,      jobs: 3 }
+    { core: 0.020833, memory: 0.020833, ssd: 0.015656, nic: 0.025 },
+    { core: 0.020833, memory: 0.003906, ssd: 0.010064, nic: 0.000125 },
+    { core: 0.041667, memory: 0.041667, ssd: 0.029075, nic: 0.05 },
+    { core: 0.166667, memory: 0.166667, ssd: 0.109589, nic: 0.2 },
+    { core: 0.083333, memory: 0.083333, ssd: 0.055913, nic: 0.1 },
+    { core: 0.333333, memory: 0.333333, ssd: 0.216942, nic: 0.4 },
+    { core: 0.75,     memory: 0.75,     ssd: 0.588202, nic: 0.6 },
+    { core: 0.5,      memory: 0.5,      ssd: 0.324294, nic: 0.525 },
+    { core: 0.666667, memory: 0.666667, ssd: 0.431647, nic: 0.5 },
+    { core: 0.041667, memory: 0.018229, ssd: 0.026838, nic: 0.005 },
+    { core: 0.083333, memory: 0.036458, ssd: 0.053676, nic: 0.01 },
+    { core: 1.0,      memory: 1.0,      ssd: 1.0,      nic: 1.0 }
   ];
-  const FEW_EXAMPLES = 500;
-  const CUSTOM = 'custom';
+  // Judgment call, not validated: farther than this from every known size counts as "far".
+  // The two closest known sizes are about 0.03 apart.
+  const CLOSE_ENOUGH = 0.02;
+  const FIELDS = ['core', 'memory', 'ssd', 'nic'];
 
-  function describe(type) {
-    return `core ${type.core.toFixed(3)}, memory ${type.memory.toFixed(3)}, ` +
-           `ssd ${type.ssd.toFixed(3)}, nic ${type.nic.toFixed(3)}`;
+  // Minutes, with a rough hours or days figure for long durations
+  function formatMinutes(minutes) {
+    const text = Math.round(minutes).toLocaleString();
+    if (minutes >= 2880) return `${text} min (about ${(minutes / 1440).toFixed(1)} days)`;
+    if (minutes >= 120) return `${text} min (about ${(minutes / 60).toFixed(1)} hours)`;
+    return `${text} min`;
   }
 
-  function isCustom() {
-    return document.getElementById('vmtype').value === CUSTOM;
-  }
-
-  function readCustom() {
-    const read = (id) => parseInt(document.getElementById(id).value) / 1000;
-    return { core: read('core'), memory: read('memory'), ssd: read('ssd'), nic: read('nic') };
-  }
-
-  function buildDropdown() {
-    const select = document.getElementById('vmtype');
-    VM_TYPES.forEach((type, index) => {
-      const option = document.createElement('option');
-      option.value = index;
-      const flag = type.jobs < FEW_EXAMPLES ? ' (few examples)' : '';
-      option.textContent = `Size ${index + 1}: ${describe(type)} | ${type.jobs.toLocaleString()} training jobs${flag}`;
-      select.appendChild(option);
+  function readSliders() {
+    const values = {};
+    FIELDS.forEach((name) => {
+      values[name] = parseInt(document.getElementById(name).value) / 1000;
     });
-    const custom = document.createElement('option');
-    custom.value = CUSTOM;
-    custom.textContent = 'Custom size (not seen by the model)';
-    select.appendChild(custom);
-    showType();
+    return values;
   }
 
-  function updateCustom() {
-    const values = readCustom();
-    for (const name of ['core', 'memory', 'ssd', 'nic']) {
-      document.getElementById(name + '_val').textContent = values[name].toFixed(3);
-    }
-    // Find the closest of the 12 known sizes
-    let bestIndex = 0;
-    let bestDistance = Infinity;
-    VM_TYPES.forEach((type, index) => {
+  function distanceToNearestKnown(values) {
+    let best = Infinity;
+    VM_TYPES.forEach((type) => {
       const distance = Math.sqrt(
         (type.core - values.core) ** 2 + (type.memory - values.memory) ** 2 +
         (type.ssd - values.ssd) ** 2 + (type.nic - values.nic) ** 2
       );
-      if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
+      if (distance < best) best = distance;
     });
-    const nearest = VM_TYPES[bestIndex];
-    document.getElementById('nearestHint').textContent =
-      `Closest size in the data: Size ${bestIndex + 1} (${describe(nearest)}, ` +
-      `${nearest.jobs.toLocaleString()} training jobs), distance ${bestDistance.toFixed(3)}.`;
+    return best;
   }
 
-  function showType() {
-    const panel = document.getElementById('customPanel');
-    const hint = document.getElementById('typeHint');
-    const warning = document.getElementById('typeWarning');
-
-    if (isCustom()) {
-      panel.style.display = 'block';
-      hint.textContent = '';
-      warning.style.display = 'none';
-      updateCustom();
-      return;
-    }
-
-    panel.style.display = 'none';
-    const type = VM_TYPES[parseInt(document.getElementById('vmtype').value)];
-    hint.textContent = `Resource request as a fraction of a server: ${describe(type)}.`;
-    if (type.jobs < FEW_EXAMPLES) {
-      warning.textContent =
-        `Only ${type.jobs} training jobs have this size, so predictions for it are less reliable.`;
-      warning.style.display = 'block';
-    } else {
-      warning.style.display = 'none';
-    }
+  function refresh() {
+    const values = readSliders();
+    FIELDS.forEach((name) => {
+      document.getElementById(name + '_val').textContent = values[name].toFixed(3);
+    });
   }
 
   async function predict() {
     const hour = parseInt(document.getElementById('hour').value);
-    const custom = isCustom();
-    const type = custom ? readCustom() : VM_TYPES[parseInt(document.getElementById('vmtype').value)];
+    const values = readSliders();
+    const far = distanceToNearestKnown(values) > CLOSE_ENOUGH;
 
     // starttime is in days; the model only uses the hour of day
     const starttime = hour / 24;
 
     const payload = {
       starttime: starttime,
-      core:     type.core,
-      memory:   type.memory,
-      ssd:      type.ssd,
-      nic:      type.nic,
-      priority: 0   // the training data contains priority 0 jobs only
+      core:     values.core,
+      memory:   values.memory,
+      ssd:      values.ssd,
+      nic:      values.nic,
+      priority: 0,    // the training data contains priority 0 jobs only
+      custom:   far   // lets the server tell the explanation that this is a guess
     };
 
     // Show loading, hide results
@@ -307,40 +230,17 @@
 
       const data = await response.json();
 
-      // Warn when the size is not one the model was trained on
-      const resultWarning = document.getElementById('resultWarning');
-      if (custom) {
-        resultWarning.textContent =
-          'This is a custom size the model has never seen. The number below is an ' +
-          'extrapolation that was not validated, so treat it as a guess. The explanation ' +
-          'below does not know this and may sound more confident than it should.';
-        resultWarning.style.display = 'block';
-      } else {
-        resultWarning.style.display = 'none';
-      }
+      document.getElementById('durationNum').textContent = data.predicted_duration;
 
-      // Display duration
-      document.getElementById('durationNum').textContent =
-        data.predicted_duration;
+      const rangeDiv = document.getElementById('rangeDiv');
+      rangeDiv.textContent =
+        `90% range: ${formatMinutes(data.range_low)} to ${formatMinutes(data.range_high)}. ` +
+        `This range is meant to contain about 9 in 10 similar jobs. On held-out days it ` +
+        `contained about 88%. It is wide because the inputs say little about how long an ` +
+        `individual job runs.`;
+      rangeDiv.style.display = 'block';
 
-      // Display the 3am comparison as a rough model estimate, not as advice
-      const savings = data.savings;
-      const savingsDiv = document.getElementById('savingsDiv');
-      const direction = savings > 0 ? 'fewer' : 'more';
-      savingsDiv.textContent =
-        `Model estimate for the same job at 3am: about ${data.off_peak_duration} minutes ` +
-        `(${Math.abs(savings)} ${direction}). Time of day improved this model's overall accuracy ` +
-        `only slightly, and this comparison was not tested as advice, so treat it as a rough ` +
-        `estimate, not a recommendation.`;
-      savingsDiv.style.background = '#fff8e1';
-      savingsDiv.style.color = '#6d4c00';
-      savingsDiv.style.display = 'block';
-
-      // Display explanation
-      document.getElementById('explanationDiv').textContent =
-        data.explanation;
-
-      // Show result card
+      document.getElementById('explanationDiv').textContent = data.explanation;
       document.getElementById('resultCard').style.display = 'block';
 
     } catch (error) {
@@ -352,7 +252,7 @@
     }
   }
 
-  buildDropdown();
+  refresh();
 </script>
 
 </body>
