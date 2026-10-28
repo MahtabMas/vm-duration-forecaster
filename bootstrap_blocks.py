@@ -1,7 +1,9 @@
 import numpy as np
 from data import load_and_split, make_target
+import sys
 
-saved = np.load("results/test_predictions.npz")
+file_name = sys.argv[1] if len(sys.argv) > 1 else "results/test_predictions.npz"
+saved = np.load(file_name)
 true_target = saved["true_target"]
 gb_predictions = saved["gradient_boosting"]
 mlp_predictions = [saved[f"mlp_seed_{seed}"] for seed in range(5)]
