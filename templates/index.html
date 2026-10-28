@@ -216,8 +216,9 @@
       const direction = savings > 0 ? 'fewer' : 'more';
       savingsDiv.textContent =
         `Model estimate for the same job at 3am: about ${data.off_peak_duration} minutes ` +
-        `(${Math.abs(savings)} ${direction}). Time of day has only a small effect in this ` +
-        `model, so treat this as a rough estimate, not a recommendation.`;
+        `(${Math.abs(savings)} ${direction}). Time of day improved this model's overall accuracy ` +
+        `only slightly, and this comparison was not tested as advice, so treat it as a rough ` +
+        `estimate, not a recommendation.`;
       savingsDiv.style.background = '#fff8e1';
       savingsDiv.style.color = '#6d4c00';
       savingsDiv.style.display = 'block';
