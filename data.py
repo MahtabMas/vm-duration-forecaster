@@ -41,3 +41,15 @@ def get_model_data():
     return (train_features, train_target,
             validation_features, validation_target,
             test_features, test_target)
+
+
+def standardize(train_features, validation_features, test_features):
+    # Rescale every feature using the training rows only.
+    training_average = train_features.mean()
+    training_spread = train_features.std()
+
+    train_scaled = (train_features - training_average) / training_spread
+    validation_scaled = (validation_features - training_average) / training_spread
+    test_scaled = (test_features - training_average) / training_spread
+
+    return train_scaled, validation_scaled, test_scaled
