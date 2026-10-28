@@ -35,3 +35,15 @@ for index, set_name in enumerate(["validation", "test"]):
     share_lost = (r2_with - r2_without) / r2_with
     print(f"{set_name}: r2 drops from {r2_with:.4f} to {r2_without:.4f}, "
           f"share of r2 lost without time features: {share_lost:.1%}")
+
+print()
+time_only_model = GradientBoostingRegressor(
+    n_estimators=200, max_depth=5, learning_rate=0.05, random_state=42
+)
+time_only_model.fit(train_features[TIME_FEATURES], train_target)
+
+for set_name, features, target in [("validation", validation_features, validation_target),
+                                   ("test", test_features, test_target)]:
+    scores = score_log_scale(target, time_only_model.predict(features[TIME_FEATURES]))
+    print(f"time features only, {set_name}: mae {scores['mae']:.4f}  "
+          f"rmse {scores['rmse']:.4f}  r2 {scores['r2']:.4f}")
