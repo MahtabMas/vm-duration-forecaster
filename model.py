@@ -100,15 +100,7 @@ def predict(model, starttime, core, memory, ssd, nic, priority, interval_models=
     # priority is accepted for compatibility with main.py but is not a model input
     duration = predict_minutes(model, starttime, core, memory, ssd, nic)
 
-    # Counterfactual: the same job submitted at 3am (to be removed from the app in step 2)
-    off_peak_starttime = int(starttime) + 0.125
-    off_peak_duration = predict_minutes(model, off_peak_starttime, core, memory, ssd, nic)
-
-    result = {
-        "predicted_duration": round(duration, 1),
-        "off_peak_duration": round(off_peak_duration, 1),
-        "savings": round(duration - off_peak_duration, 1),
-    }
+    result = {"predicted_duration": round(duration, 1)}
 
     if interval_models is not None:
         lower_model, upper_model = interval_models
@@ -119,7 +111,6 @@ def predict(model, starttime, core, memory, ssd, nic, priority, interval_models=
         result["range_high"] = round(max(lower, upper), 1)
 
     return result
-
 
 # Original row-by-row feature builder. Kept only so that
 # experiments/check_features.py can verify the fast version against it.
